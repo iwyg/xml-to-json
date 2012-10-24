@@ -240,12 +240,13 @@
 	</xsl:template>
 
 	<!-- object -->
-	<xsl:template match="*" mode="xml-to-json" >
+	<xsl:template match="*" mode="xml-to-json">
+		<xsl:param name="omitt-attr"  select="false()"/>
 		<xsl:if test="not(preceding-sibling::*)">
 			<xsl:text>{</xsl:text>
 			<!-- attributes -->
-			<xsl:if test="../@*">
-				<xsl:apply-templates select="../@*" mode="xml-to-json"/>
+			<xsl:if test="parent::node()/@* and not($omitt-attr)">
+				<xsl:apply-templates select="parent::node()/@*" mode="xml-to-json"/>
 			</xsl:if>
 			<!-- attributes -->
 		</xsl:if>
@@ -267,10 +268,10 @@
 	<xsl:template match="*[count(../*[name(../*)=name(.)])=count(../*) and (count(../*)&gt;1 or (count(../*)&gt;0 and  document('')/*/wc:array/attr = name(.) ))]" mode="xml-to-json">
 
 		<xsl:choose>
-			<xsl:when test="../@*">
+			<xsl:when test="parent::node()/@*">
 				<xsl:if test="not(preceding-sibling::*)">
 					<xsl:text>{</xsl:text>
-					<xsl:apply-templates select="../@*" mode="xml-to-json"/>
+					<xsl:apply-templates select="parent::node()/@*" mode="xml-to-json"/>
 					<xsl:text>"values":</xsl:text>
 				</xsl:if>
 				<xsl:apply-templates select="." mode="array"/>
@@ -287,17 +288,19 @@
 
 	<xsl:template match="node()" mode="array">
 		<xsl:choose>
-			<xsl:when test="./@*">
+			<xsl:when test="@*">
 				<xsl:if test="not(preceding-sibling::*)">[</xsl:if>
 				<xsl:text>{</xsl:text>
-				<xsl:apply-templates select="./@*" mode="xml-to-json"/>
+				<xsl:apply-templates select="@*" mode="xml-to-json"/>
 				<xsl:text>"value":</xsl:text>
 				<xsl:choose>
 					<xsl:when test="not(child::node())">
 						<xsl:text>null</xsl:text>
 					</xsl:when>
 					<xsl:otherwise>
-						<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+						<xsl:apply-templates select="child::node()" mode="xml-to-json">
+							<xsl:with-param name="omitt-attr" select="true()"/>
+						</xsl:apply-templates>
 					</xsl:otherwise>
 				</xsl:choose>
 				<xsl:text>}</xsl:text>
