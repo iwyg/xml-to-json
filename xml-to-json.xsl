@@ -241,14 +241,13 @@
 
 	<!-- object -->
 	<xsl:template match="*" mode="xml-to-json">
-		<xsl:param name="omitt-attr"  select="false()"/>
 		<xsl:if test="not(preceding-sibling::*)">
 			<xsl:text>{</xsl:text>
-			<!-- attributes -->
-			<xsl:if test="parent::node()/@* and not($omitt-attr)">
-				<xsl:apply-templates select="parent::node()/@*" mode="xml-to-json"/>
-			</xsl:if>
-			<!-- attributes -->
+		<!-- attributes -->
+		<xsl:if test="./@*">
+			<xsl:apply-templates select="./@*" mode="xml-to-json"/>
+		</xsl:if>
+		<!-- attributes -->
 		</xsl:if>
 		<xsl:call-template name="escape-string">
 			<xsl:with-param name="s" select="name()"/>
@@ -290,17 +289,16 @@
 		<xsl:choose>
 			<xsl:when test="@*">
 				<xsl:if test="not(preceding-sibling::*)">[</xsl:if>
-				<xsl:text>{</xsl:text>
+				<xsl:if test="parent::node()">{</xsl:if>
 				<xsl:apply-templates select="@*" mode="xml-to-json"/>
+				<!--<xsl:text>{</xsl:text>-->
 				<xsl:text>"value":</xsl:text>
 				<xsl:choose>
 					<xsl:when test="not(child::node())">
 						<xsl:text>null</xsl:text>
 					</xsl:when>
 					<xsl:otherwise>
-						<xsl:apply-templates select="child::node()" mode="xml-to-json">
-							<xsl:with-param name="omitt-attr" select="true()"/>
-						</xsl:apply-templates>
+						<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
 					</xsl:otherwise>
 				</xsl:choose>
 				<xsl:text>}</xsl:text>
@@ -326,3 +324,4 @@
 	</xsl:template>
 
 </xsl:stylesheet>
+
