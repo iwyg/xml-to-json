@@ -154,8 +154,6 @@
         <xsl:apply-templates select="." mode="array-transform"/>
       </xsl:otherwise>
     </xsl:choose>
-
-
   </xsl:template>
 
   <xsl:template match="*" mode="array-transform">
@@ -165,9 +163,16 @@
           <attr:attributes>
             <xsl:apply-templates select="@*" mode="transform"/>
           </attr:attributes>
-          <value>
-            <xsl:apply-templates select="child::node()" mode="transform"/>
-          </value>
+          <xsl:choose>
+            <xsl:when test="not(text())">
+              <value>
+                <xsl:apply-templates select="child::node()" mode="transform"/>
+              </value>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:apply-templates select="child::node()" mode="transform"/>
+            </xsl:otherwise>
+          </xsl:choose>
         </xsl:when>
         <xsl:otherwise>
           <xsl:apply-templates select="child::node()" mode="transform"/>
@@ -176,11 +181,7 @@
     </item>
   </xsl:template>
 
-
-
-
   <!-- string -->
-
   <xsl:template match="text()" mode="xml-to-json" >
     <xsl:choose>
       <xsl:when test=". = 'null'">null</xsl:when>
@@ -191,7 +192,6 @@
       </xsl:otherwise>
     </xsl:choose>
   </xsl:template>
-
 
   <!-- Main template for escaping strings; used by above template and for object-properties
     Responsibilities: placed quotes around string, and chain up to next filter, escape-bs-string -->
@@ -204,6 +204,7 @@
     <xsl:text>"</xsl:text>
   </xsl:template>
 
+	<!-- transform attr namspace ot @attribute-->
   <xsl:template name="escape-attributes">
     <xsl:text>@attributes</xsl:text>
   </xsl:template>
@@ -231,7 +232,6 @@
     </xsl:choose>
   </xsl:template>
 
-
   <!-- Escape the double quote ("). -->
   <xsl:template name="escape-quot-string">
     <xsl:param name="s"/>
@@ -251,7 +251,6 @@
       </xsl:otherwise>
     </xsl:choose>
   </xsl:template>
-
 
   <!-- Replace tab, line feed and/or carriage return by its matching escape code. Can't escape backslash
     or double quote here, because they don't replace characters (&#x0; becomes \t), but they prefix
@@ -282,17 +281,14 @@
     </xsl:choose>
   </xsl:template>
 
-
   <!-- number (no support for javascript mantise) -->
   <xsl:template match="text()[not(string(number())='NaN')]" mode="xml-to-json" >
     <xsl:value-of select="."/>
   </xsl:template>
 
-
   <!-- boolean, case-insensitive -->
   <xsl:template match="text()[translate(.,'TRUE','true')='true']" mode="xml-to-json" >true</xsl:template>
   <xsl:template match="text()[translate(.,'FALSE','false')='false']" mode="xml-to-json" >false</xsl:template>
-
 
   <!-- object -->
   <xsl:template match="*" mode="xml-to-json" >
@@ -307,12 +303,7 @@
     <xsl:if test="not(following-sibling::*)">}</xsl:if>
   </xsl:template>
 
-
-  <!--
-  array
-  <xsl:template match="*[count(../*[name(../*)=name(.)])=count(../*) and count(../*)&gt;1]" mode="xml-to-json" >
-  <xsl:template match="*[count(../*[name(../*)=name(.)])=count(../*) and (count(../*)&gt;1 or (count(../*)&gt;0 and document('')/*/wc:array/attr = name(.) ))]" mode="transform">
-  -->
+  <!-- array -->
   <xsl:template match="*[count(../*[name(../*)=name(.)])=count(../*) and count(../*)&gt;1 or (count(../*)&gt;0 and name() = 'item')]" mode="xml-to-json" >
     <xsl:if test="not(preceding-sibling::*)">[</xsl:if>
     <xsl:choose>
