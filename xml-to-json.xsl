@@ -102,22 +102,11 @@
 
 	<xsl:template name="xml-to-json">
 		<xsl:param name="xml"/>
-		<xsl:apply-templates select="exsl:node-set($xml)" mode="xml-to-json"/>
+		<xsl:apply-templates select="exsl:node-set($xml) | exsl:node-set($xml)/@*" mode="xml-to-json"/>
 	</xsl:template>
 
 	<!-- string -->
-	<xsl:template match="text()" mode="xml-to-json" >
-		<xsl:choose>
-			<xsl:when test=". = 'null'">null</xsl:when>
-			<xsl:otherwise>
-				<xsl:call-template name="escape-string">
-					<xsl:with-param name="s" select="."/>
-				</xsl:call-template>
-			</xsl:otherwise>
-		</xsl:choose>
-	</xsl:template>
-
-	<xsl:template match="text()" mode="xml-to-json" >
+	<xsl:template match="text()" mode="xml-to-json">
 		<xsl:choose>
 			<xsl:when test=". = 'null'">null</xsl:when>
 			<xsl:otherwise>
@@ -183,6 +172,7 @@
 		or double quote here, because they don't replace characters (&#x0; becomes \t), but they prefix
 		characters (\ becomes \\). Besides, backslash should be seperate anyway, because it should be
 		processed first. This function can't do that. -->
+
 	<xsl:template name="encode-string">
 		<xsl:param name="s"/>
 		<xsl:choose>
@@ -220,7 +210,13 @@
 	<!-- attributes -->
 	<xsl:template match="@*" mode="xml-to-json">
 		<xsl:if test="position()=1">
-			<xsl:if test="preceding-sibling::*">,</xsl:if>
+			<xsl:choose>
+				<xsl:when test="preceding-sibling::*">,</xsl:when>
+				<xsl:otherwise>
+					<xsl:if test="child::node()">,</xsl:if>
+						<xsl:text>{</xsl:text>
+				</xsl:otherwise>
+			</xsl:choose>
 			<xsl:text>"@attributes":{</xsl:text>
 		</xsl:if>
 		<xsl:call-template name="escape-string">
@@ -231,30 +227,39 @@
 			<xsl:with-param name="s" select="."/>
 		</xsl:call-template>
 		<xsl:choose>
-			<xsl:when test="position() != last()">,</xsl:when>
+			<xsl:when test="position() != count(../@*)">,</xsl:when>
 			<xsl:otherwise>
 				<xsl:text>}</xsl:text>
-				<xsl:if test="count(.)!=0">,</xsl:if>
+					<xsl:if test="count(.)!=0">,</xsl:if>
 			</xsl:otherwise>
 		</xsl:choose>
 	</xsl:template>
 
 	<!-- object -->
 	<xsl:template match="*" mode="xml-to-json">
-		<xsl:if test="not(preceding-sibling::*)">
+		<xsl:if test="not(preceding-sibling::*) and count(../@*)=0">
 			<xsl:text>{</xsl:text>
-		<!-- attributes -->
-		<xsl:if test="./@*">
-			<xsl:apply-templates select="./@*" mode="xml-to-json"/>
-		</xsl:if>
-		<!-- attributes -->
 		</xsl:if>
 		<xsl:call-template name="escape-string">
 			<xsl:with-param name="s" select="name()"/>
 		</xsl:call-template>
 		<xsl:text>:</xsl:text>
-		<xsl:if test="count(child::node())=0">""</xsl:if>
-		<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+		<xsl:choose>
+			<xsl:when test="./@*">
+				<xsl:apply-templates select="./@*" mode="xml-to-json"/>
+				<xsl:if test="child::node() = text()">
+					<xsl:text>"value":</xsl:text>
+				</xsl:if>
+				<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+				<!--
+					<xsl:if test="not(text()) and parent::node() = text() and count(following-sibling::*)=0">#}</xsl:if>
+				-->
+			</xsl:when>
+			<xsl:otherwise>
+				<xsl:if test="count(child::node())=0">""</xsl:if>
+				<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+			</xsl:otherwise>
+		</xsl:choose>
 		<xsl:if test="following-sibling::*">,</xsl:if>
 		<xsl:if test="not(following-sibling::*)">}</xsl:if>
 	</xsl:template>
@@ -266,62 +271,39 @@
 	-->
 	<xsl:template match="*[count(../*[name(../*)=name(.)])=count(../*) and (count(../*)&gt;1 or (count(../*)&gt;0 and  document('')/*/wc:array/attr = name(.) ))]" mode="xml-to-json">
 
+		<xsl:if test="not(preceding-sibling::*)">
+			<xsl:if test="count(parent::node()/@*)!=0">"values":</xsl:if>
+			<xsl:text>[</xsl:text>
+		</xsl:if>
+
 		<xsl:choose>
-			<xsl:when test="parent::node()/@*">
-				<xsl:if test="not(preceding-sibling::*)">
-					<xsl:text>{</xsl:text>
-					<xsl:apply-templates select="parent::node()/@*" mode="xml-to-json"/>
-					<xsl:text>"values":</xsl:text>
-				</xsl:if>
-				<xsl:apply-templates select="." mode="array"/>
-				<xsl:if test="not(following-sibling::*)">
-					<xsl:text>}</xsl:text>
-				</xsl:if>
+			<xsl:when test="not(child::node())">
+				<xsl:text>null</xsl:text>
 			</xsl:when>
 			<xsl:otherwise>
-				<xsl:apply-templates select="." mode="array"/>
-			</xsl:otherwise>
-		</xsl:choose>
-
-	</xsl:template>
-
-	<xsl:template match="node()" mode="array">
-		<xsl:choose>
-			<xsl:when test="@*">
-				<xsl:if test="not(preceding-sibling::*)">[</xsl:if>
-				<xsl:if test="parent::node()">{</xsl:if>
-				<xsl:apply-templates select="@*" mode="xml-to-json"/>
-				<!--<xsl:text>{</xsl:text>-->
-				<xsl:text>"value":</xsl:text>
 				<xsl:choose>
-					<xsl:when test="not(child::node())">
-						<xsl:text>null</xsl:text>
+					<xsl:when test="count(@*)=0">
+						<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+						<xsl:if test="not(text()) and count(parent::node()/@*)=0">}</xsl:if>
 					</xsl:when>
 					<xsl:otherwise>
+						<xsl:apply-templates select="@*" mode="xml-to-json"/>
+						<xsl:text>"value":</xsl:text>
+						<xsl:if test="not(text())">{</xsl:if>
 						<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
+						<xsl:if test="(not(text()) or count(parent::node()/@*)!=0) or (text())">}</xsl:if>
+						<xsl:if test="count(child::node()/@*)!=0">}</xsl:if>
 					</xsl:otherwise>
 				</xsl:choose>
-				<xsl:text>}</xsl:text>
-				<xsl:if test="following-sibling::*">,</xsl:if>
-				<xsl:if test="not(following-sibling::*)">]</xsl:if>
-			</xsl:when>
-			<xsl:otherwise>
-
-				<xsl:if test="not(preceding-sibling::*)">[</xsl:if>
-				<xsl:choose>
-					<xsl:when test="not(child::node())">
-						<xsl:text>null</xsl:text>
-					</xsl:when>
-					<xsl:otherwise>
-						<xsl:apply-templates select="child::node()" mode="xml-to-json"/>
-					</xsl:otherwise>
-				</xsl:choose>
-				<xsl:if test="following-sibling::*">,</xsl:if>
-				<xsl:if test="not(following-sibling::*)">]</xsl:if>
-
 			</xsl:otherwise>
 		</xsl:choose>
+		<xsl:if test="following-sibling::*">
+			<xsl:text>,</xsl:text>
+		</xsl:if>
+		<xsl:if test="not(following-sibling::*)">
+			<xsl:text>]</xsl:text>
+			<xsl:if test="count(parent::node()/@*)!=0">}</xsl:if>
+		</xsl:if>
 	</xsl:template>
 
 </xsl:stylesheet>
-
